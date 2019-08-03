@@ -4,20 +4,23 @@ import requests
 import json
 import getopt
 import sys
+import time
+import random
 
 
 '''
 从浏览器中复制cookie的值过来
 '''
-cookie="acw_tc=7b39758815640324801285746ed6be5443ccbe3dd5fdf8e38e0cfcb2297665; __utmz=105455707.1564032650.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); _dx_uzZo5y=f940492d5055c1176a822dabb20087f9603810f8ea44b4051cdb5cc9ee540a42ef0b14be; __utma=105455707.1834450751.1564032650.1564032650.1564121234.2; _dx_app_81e16deaf5fee41ed38834363824b3e3=5d393e93LptLKe40OOsJjEMINayzeCAZWWXlcJM1; ASP.NET_SessionId=den53lqafvq4f25xxmzvrq5r; ajaxkey=F2FB35F25190281B2CE6175D38CEB64F16EF760B6290A058; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1564551167|1564551158"
+#cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ajaxkey=DB1D7B94E2801743E49A5995AEA448136C8256AC4E7407A6; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564722761|1564722741"
+cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; ajaxkey=DB1D7B94E2801743D98730724CF5BE09A93A32BDD579027D; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564723399|1564722741"
 
 
-def get_list():
+def get_list(industrytype=5,watertype=None,hasvg=None,level=12):
     '''
     筛选条件：
     区域：全国范围，
     企业类型: 土壤风险源
-    违规情况： 有不良记录
+    违规情况：
     :return:  所有的记录点
     '''
 
@@ -25,16 +28,17 @@ def get_list():
     url = 'http://www.ipe.org.cn/data_ashx/GetAirData.ashx?xx=getindustryzhoubian_map'
     params = {
         'cmd': 'getindustryzhoubian_map',
-        'lat_leftdown': 3.931333,
-        'lng_leftdown': 107.54335999999999,
-        'lat_rightup': 35.135332999999996,
-        'lng_rightup': 109.78996,
-        'level': 5,
+        'lat_leftdown': 4,
+        'lng_leftdown': 70,
+        'lat_rightup': 53,
+        'lng_rightup': 135,
+        'level': level,
         'parentid': 0,
         'province': 0,
         'city': 0,
-        'industrytype': 5,
-        'hasvg': 1,
+        'industrytype': industrytype,
+        'watertype':watertype,
+        'hasvg': hasvg,
         'issearch': 1
     }
     headers = {
@@ -74,14 +78,14 @@ def  node_info(id):
     content = result.content.decode('utf-8')
     node = json.loads(content)
     # {"IsSuccess":"1","Data":[{"id":"77625","f_name":"广西百色东信化工有限责任公司","Year":"2019","recordcount":"1","HY":"无机酸制造","CJId":"0","HaD":"0","gltype":"0","glname":""}]}
+    time.sleep(random.random())  # 太过频繁，ip会被封
     return node['Data']
 
-def deal_result(file='./result.csv'):
+def deal_result(list=[], file='./result.csv'):
     '''
     :param file: 最后生成的csv文件
     :return:
     '''
-    list = get_list()
     if not list:
         print("get list error")
         return None
@@ -99,10 +103,19 @@ def deal_result(file='./result.csv'):
                     str(node['id']),node['f_name'],str(node['Year']),str(node['recordcount']),
                     str(node['HY']),str(node['CJId']),str(node['HaD']),str(node['gltype']),str(node['glname']),latitude,longitude
                 )
+                print(line)
                 f.write(line+"\n")
 
 
 def get_list_by_parmas(industrytype=5,watertype=None,hasvg=None):
+    '''
+    该方法，只能获取大尺度下的数据，不能精确到具体的点，不符合需求,
+    不过可以计算总数，可以验证是否有遗漏
+    :param industrytype:
+    :param watertype:
+    :param hasvg:
+    :return:
+    '''
     url = "http://www.ipe.org.cn/data_ashx/GetAirData.ashx?xx=getindustryzhoubian_map"
     params = {
         'cmd': 'getindustryzhoubian_map',
@@ -144,7 +157,6 @@ def get_list_by_parmas(industrytype=5,watertype=None,hasvg=None):
 
 
 if __name__ == '__main__':
-    #deal_result()
     try:
         argv = sys.argv[1:]
         opts, args = getopt.getopt(argv,"iwh",["industrytype=","watertype=","hasvg=","help"])
@@ -160,6 +172,7 @@ if __name__ == '__main__':
             --industrytype=  # 5为土壤风险源 4 垃圾焚烧厂 3 污水处理厂 2 近期有新增违规记录或超标排放 1重点排污单位  0,3,4,5,1,2 全部
             --watertype # 排放数据 2 企业反馈 1 自行监测  0,1,2,3 全部
             --hasvg # 0,1,2 全部  1 有不良记录  2 无不良记录
+            default:  python ipe_data.py   默认只获取 土壤风险源的
             eg1:  python ipe_data.py  --industrytype=5,2 --watertype=1,2  --hasvg=1
             eg2:  python ipe_data.py  --industrytype=5    只查询 土壤风险源
             ''')
@@ -170,4 +183,7 @@ if __name__ == '__main__':
             watertype = arg
         elif opt in ("--hasvg"):
             hasvg = arg
-    get_list_by_parmas(industrytype,watertype,hasvg)
+    # 默认只获取 土壤风险源的
+    list = get_list(industrytype,watertype,hasvg)
+    file = str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
+    deal_result(list,file)
