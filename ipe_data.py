@@ -6,14 +6,19 @@ import getopt
 import sys
 import time
 import random
+import redis
 
 
 '''
 从浏览器中复制cookie的值过来
 '''
 #cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ajaxkey=DB1D7B94E2801743E49A5995AEA448136C8256AC4E7407A6; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564722761|1564722741"
-cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; ajaxkey=DB1D7B94E2801743D98730724CF5BE09A93A32BDD579027D; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564723399|1564722741"
+cookie="acw_tc=7b39758715668591300895559e0501e995d741bf7fbc36b7c35af15cbe217b; ASP.NET_SessionId=qu3ltqf1zrq5bkc01korfczf; ajaxkey=DB1D7B94E28017431941B2A373D24148A6AADA7095EE3409; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1566861342|1566861327"
 
+# 连接本地redis
+r = redis.Redis(host="127.0.0.1",port=6379,db=0)
+setKey= "ipe_set"   # 记录已经获取详情的id
+cacheKey = "ipe_list_data"
 
 def get_list(industrytype=5,watertype=None,hasvg=None,level=12):
     '''
@@ -49,9 +54,14 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=12):
     }
 
     try:
-        result = requests.post(url,data=params, headers=headers)
-        content = result.content.decode('utf-8')
-        list = json.loads(content)
+        if r.get(cacheKey) is None:
+            result = requests.post(url,data=params, headers=headers)
+            content = result.content.decode('utf-8')
+            r.set(cacheKey,content)
+            list = json.loads(content)
+        else:
+            content = r.get(cacheKey).decode('utf-8')
+            list = json.loads(content)
         # [['1334593', '37.204320', '119.953803', '0', '216', '18', '1'], ['309156', '28.980050', '111.688940', '0', '0', '0', '1'] .... ]
         return list['Data']
     except Exception as err:
@@ -88,11 +98,16 @@ def deal_result(list=[], file='./result.csv'):
     '''
     if not list:
         print("get list error")
+        r.delete(cacheKey)
+        r.delete(setKey)
         return None
     with open(file,'wt',encoding='utf_8_sig') as f:
         f.write("ID,f_name,Year,recordcount,HY,CJId,HaD,gltype,glname,latitude,longitude\n")
         for item in list:
             id = item[0]
+            # 如果已经获取了该节点的详情，就不用再请求了
+            if r.sismember(setKey,id):
+                continue
             latitude = item[1] # 纬度
             longitude = item[2] # 经度
             nodeInfo = node_info(id)
@@ -105,6 +120,7 @@ def deal_result(list=[], file='./result.csv'):
                 )
                 print(line)
                 f.write(line+"\n")
+                r.sadd(setKey,id)
 
 
 def get_list_by_parmas(industrytype=5,watertype=None,hasvg=None):
@@ -185,5 +201,5 @@ if __name__ == '__main__':
             hasvg = arg
     # 默认只获取 土壤风险源的
     list = get_list(industrytype,watertype,hasvg)
-    file = str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
+    file = './data/'+str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
     deal_result(list,file)
