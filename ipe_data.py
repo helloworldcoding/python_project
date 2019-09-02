@@ -130,7 +130,7 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
     areas = split_area()
     res = []
     list_total_len = 0
-    r.set("list_total_len") = 0
+    r.set("list_total_len",0)
     for area in areas:
         params['lat_leftdown'] = area['lat_leftdown']
         params['lng_leftdown'] = area['lng_leftdown']
@@ -140,7 +140,7 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
         areaList = query_one_area(params,areaCacheKey)
         if areaList:
             res = res + areaList
-            tmp_len = r.get("list_total_len") + len(areaList)
+            tmp_len = int(r.get("list_total_len").decode('utf-8')) + len(areaList)
             r.set("list_total_len",tmp_len)
     return res
 
