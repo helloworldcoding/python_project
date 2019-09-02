@@ -13,7 +13,7 @@ import redis
 从浏览器中复制cookie的值过来
 '''
 #cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ajaxkey=DB1D7B94E2801743E49A5995AEA448136C8256AC4E7407A6; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564722761|1564722741"
-cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; __utmz=105455707.1564723333.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=105455707.2050914565.1564723333.1564723333.1566899238.2; ajaxkey=DB1D7B94E28017438A5094304CA1BE1346C95E37571B8D81; ASP.NET_SessionId=ruofgsohpqouqx3veiiiemxf; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1566967112|1566966415"
+cookie="acw_tc=7b39758715668591300895559e0501e995d741bf7fbc36b7c35af15cbe217b; ajaxkey=3BD434C4038E6CE7C59FD25EA6F35CF7315868056262BB91; ASP.NET_SessionId=kakchxdqto4mwb1a2lq5z31c; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1567465793|1567465766"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=0)
@@ -57,6 +57,55 @@ request = requests.get(url, proxies={'http': random.choice(pro)}, headers=head) 
 request.encoding = request.apparent_encoding # 设置编码 encoding 返回的是请求头编码 apparent_encoding 是从内容网页中分析出的响应内容编码方式
 print(request.text) # 输出返回的内容
 '''
+def split_area(lat_num=10,lng_num=10):
+    lat_leftdown = 4    #北纬4度
+    lng_leftdown = 70   #东经70度
+    lat_rightup = 53    #北纬53度
+    lng_rightup = 135   #东经135度
+    '''
+    按照经纬度，划分为lat_num * lng_num等分
+    '''
+    lat_diff = (lat_rightup - lat_leftdown) / lat_num
+    lng_diff = (lng_rightup - lng_leftdown) / lng_num
+    areas = []
+    for i in range(lat_num):
+        for j in range(lng_num):
+            tmp = {
+                    "lat_leftdown":lat_leftdown + i * lat_diff,
+                    "lng_leftdown":lng_leftdown + j * lng_diff,
+                    "lat_rightup":lat_rightup + (i+1) * lat_diff,
+                    "lng_rightup":lng_rightup + (j +1) * lng_diff,
+                    }
+            areas.append(tmp)
+            
+    return areas
+            
+def query_one_area(params="", areaCacheKey=""):
+    '''
+    查询某块区域
+    '''
+    url = 'http://www.ipe.org.cn/data_ashx/GetAirData.ashx?xx=getindustryzhoubian_map'
+    headers = {
+        'Content-Type':'application/x-www-form-urlencoded',
+        'Referer': 'http://www.ipe.org.cn/IndustryMap/IndustryMap.aspx?q=7',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36',
+        'Cookie': cookie
+    }
+
+    try:
+        if r.get(areaCacheKey) is None:
+            result = requests.post(url,data=params, proxies=proxies, headers=headers)
+            content = result.content.decode('utf-8')
+            r.set(areaCacheKey,content)
+            list = json.loads(content)
+        else:
+            content = r.get(areaCacheKey).decode('utf-8')
+            list = json.loads(content)
+        # [['1334593', '37.204320', '119.953803', '0', '216', '18', '1'], ['309156', '28.980050', '111.688940', '0', '0', '0', '1'] .... ]
+        return list['Data']
+    except Exception as err:
+        print(err)
+        return None
 
 def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
     '''
@@ -66,15 +115,8 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
     违规情况：
     :return:  所有的记录点
     '''
-
-    # url params headers 这三个参数都是直接从浏览器获取的。
-    url = 'http://www.ipe.org.cn/data_ashx/GetAirData.ashx?xx=getindustryzhoubian_map'
     params = {
         'cmd': 'getindustryzhoubian_map',
-        'lat_leftdown': 4,
-        'lng_leftdown': 70,
-        'lat_rightup': 53,
-        'lng_rightup': 135,
         'level': level,
         'parentid': 0,
         'province': 0,
@@ -84,33 +126,24 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
         'hasvg': hasvg,
         'issearch': 1
     }
-    headers = {
-        'Content-Type':'application/x-www-form-urlencoded',
-        'Referer': 'http://www.ipe.org.cn/IndustryMap/IndustryMap.aspx?q=7',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36',
-        'Cookie': cookie
-    }
 
-    try:
-        if r.get(cacheKey) is None:
-            result = requests.post(url,data=params, proxies=proxies, headers=headers)
-            content = result.content.decode('utf-8')
-            r.set(cacheKey,content)
-            list = json.loads(content)
-        else:
-            content = r.get(cacheKey).decode('utf-8')
-            list = json.loads(content)
-        # [['1334593', '37.204320', '119.953803', '0', '216', '18', '1'], ['309156', '28.980050', '111.688940', '0', '0', '0', '1'] .... ]
-        sum = 0
-        r.set("list_len",len(list["Data"]))
-        for item in list['Data']:
-            sum = sum + int(item[4])
-        print("节点总数：%d" % sum)
-        r.set('ipe_node_num', sum)
-        return list['Data']
-    except Exception as err:
-        print(err)
-        return None
+    areas = split_area()
+    res = []
+    list_total_len = 0
+    r.set("list_total_len") = 0
+    for area in areas:
+        params['lat_leftdown'] = area['lat_leftdown']
+        params['lng_leftdown'] = area['lng_leftdown']
+        params['lat_rightup'] = area['lat_rightup']
+        params['lng_rightup'] = area['lng_rightup']
+        areaCacheKey = 'area_cache_'+str(area['lat_leftdown'])+str(area['lng_leftdown'])+str(area['lat_rightup'])+str(area['lng_rightup'])
+        areaList = query_one_area(params,areaCacheKey)
+        if areaList:
+            res = res + areaList
+            tmp_len = r.get("list_total_len") + len(areaList)
+            r.set("list_total_len",tmp_len)
+    return res
+
 
 def  node_info(id):
     '''
@@ -207,7 +240,7 @@ def get_list_by_parmas(industrytype=5,watertype=None,hasvg=None):
         return None
     file = str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_result_by_params.csv"
     with open(file,'wt',encoding='utf_8_sig') as f:
-        f.write("ID,latitude,longitude,unknow,number,unknow1,unknow2\n")
+        #f.write("ID,latitude,longitude,unknow,number,unknow1,unknow2\n")
         for item in nodes:
             line = ','.join(item)
             f.write(line+"\n")
