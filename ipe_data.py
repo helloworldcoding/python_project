@@ -12,8 +12,7 @@ import redis
 '''
 从浏览器中复制cookie的值过来
 '''
-#cookie="acw_tc=65c86a0b15646457645586587e3edfa07c6851152f8ff5213f60fbf03fb25e; ajaxkey=DB1D7B94E2801743E49A5995AEA448136C8256AC4E7407A6; ASP.NET_SessionId=rlkza1zyjb1c4o2neb1yebhe; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1564722761|1564722741"
-cookie="acw_tc=7b39758715668591300895559e0501e995d741bf7fbc36b7c35af15cbe217b; ajaxkey=3BD434C4038E6CE7C59FD25EA6F35CF7315868056262BB91; ASP.NET_SessionId=kakchxdqto4mwb1a2lq5z31c; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1567465793|1567465766"
+cookie="__utmz=105455707.1564723333.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=105455707.2050914565.1564723333.1564723333.1566899238.2; acw_tc=7b39758815674722932206811e6ca46c6ff24bf4134662e70f6572372cbb9e; ASP.NET_SessionId=pac13wwg1c53prvkkgjyrq22; ajaxkey=3BD434C4038E6CE733B87A77531C05E02FCFFAAF5FEC0331; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1567474263|1567474256"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=0)
@@ -57,7 +56,7 @@ request = requests.get(url, proxies={'http': random.choice(pro)}, headers=head) 
 request.encoding = request.apparent_encoding # 设置编码 encoding 返回的是请求头编码 apparent_encoding 是从内容网页中分析出的响应内容编码方式
 print(request.text) # 输出返回的内容
 '''
-def split_area(lat_num=10,lng_num=10):
+def split_area(lat_num=30,lng_num=30):
     lat_leftdown = 4    #北纬4度
     lng_leftdown = 70   #东经70度
     lat_rightup = 53    #北纬53度
@@ -73,8 +72,8 @@ def split_area(lat_num=10,lng_num=10):
             tmp = {
                     "lat_leftdown":lat_leftdown + i * lat_diff,
                     "lng_leftdown":lng_leftdown + j * lng_diff,
-                    "lat_rightup":lat_rightup + (i+1) * lat_diff,
-                    "lng_rightup":lng_rightup + (j +1) * lng_diff,
+                    "lat_rightup":lat_leftdown + (i+1) * lat_diff,
+                    "lng_rightup":lng_leftdown + (j +1) * lng_diff,
                     }
             areas.append(tmp)
             
@@ -98,13 +97,14 @@ def query_one_area(params="", areaCacheKey=""):
             content = result.content.decode('utf-8')
             r.set(areaCacheKey,content)
             list = json.loads(content)
+            time.sleep(random.random())  # 太过频繁，ip会被封
         else:
             content = r.get(areaCacheKey).decode('utf-8')
             list = json.loads(content)
         # [['1334593', '37.204320', '119.953803', '0', '216', '18', '1'], ['309156', '28.980050', '111.688940', '0', '0', '0', '1'] .... ]
         return list['Data']
     except Exception as err:
-        print(err)
+        print(content,err)
         return None
 
 def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
