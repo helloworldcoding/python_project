@@ -15,7 +15,7 @@ import redis
 cookie="acw_tc=7b39758715707976576964062e7119b5ac4616eaa1681ad955541e129aec1f; ASP.NET_SessionId=2z3zqamqprbw4lpypqr5qxqk; ajaxkey=D1BA155ABCD723D5B2D141BB010DF9C5F8A61EF07E5B96F1; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1571236662|1571236651"
 
 # 连接本地redis
-r = redis.Redis(host="127.0.0.1",port=6379,db=0)
+r = redis.Redis(host="127.0.0.1",port=6379,db=1)
 setKey= "ipe_set"   # 记录已经获取详情的id
 cacheKey = "ipe_list_data"
 ips = [
@@ -37,7 +37,7 @@ ips = [
 ]
 #request = requests.get(url, proxies={'http': random.choice(pro)}, headers=head) # 让问这个网页 随机生成一个ip
 proxies = {'http':random.choice(ips)}
-proxies = None
+#proxies = None
 
 
 '''
@@ -70,10 +70,10 @@ def split_area(lat_num=30,lng_num=30):
     for i in range(lat_num):
         for j in range(lng_num):
             tmp = {
-                    "lat_leftdown":lat_leftdown + i * lat_diff,
-                    "lng_leftdown":lng_leftdown + j * lng_diff,
-                    "lat_rightup":lat_leftdown + (i+1) * lat_diff,
-                    "lng_rightup":lng_leftdown + (j +1) * lng_diff,
+                    "lat_leftdown":round(lat_leftdown + i * lat_diff, 5),
+                    "lng_leftdown":round(lng_leftdown + j * lng_diff,5),
+                    "lat_rightup":round(lat_leftdown + (i+1) * lat_diff,5),
+                    "lng_rightup":round(lng_leftdown + (j +1) * lng_diff,5)
                     }
             areas.append(tmp)
             
@@ -92,19 +92,29 @@ def query_one_area(params="", areaCacheKey=""):
     }
 
     try:
+        if r.sismember("no_data_area", areaCacheKey):
+            return []
         if r.get(areaCacheKey) is None:
+            print("request area %s start....\n"%(areaCacheKey))
             result = requests.post(url,data=params, proxies=proxies, headers=headers)
-            content = result.content.decode('utf-8')
-            r.set(areaCacheKey,content)
-            list = json.loads(content)
+            print("request area %s end \n"%(areaCacheKey))
+            content = result.content.decode('utf-8')  # 有可能 不是json
+            list1 = json.loads(content)
+            if "Data" in list1:
+                if list1["Data"]:
+                    r.set(areaCacheKey,content)
+                else:
+                    r.sadd("no_data_area",areaCacheKey)
+            else:
+                print("get area %s fail, reason: %s \n" % (areaCacheKey,content))
             time.sleep(random.random())  # 太过频繁，ip会被封
         else:
             content = r.get(areaCacheKey).decode('utf-8')
-            list = json.loads(content)
+            list1 = json.loads(content)
         # [['1334593', '37.204320', '119.953803', '0', '216', '18', '1'], ['309156', '28.980050', '111.688940', '0', '0', '0', '1'] .... ]
-        return list['Data']
+        return  list1["Data"] if "Data" in list1 else []
     except Exception as err:
-        print(content,err)
+        print(areaCacheKey,err)
         return None
 
 def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
@@ -139,6 +149,7 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
         areaCacheKey = 'area_cache_'+str(area['lat_leftdown'])+str(area['lng_leftdown'])+str(area['lat_rightup'])+str(area['lng_rightup'])
         areaList = query_one_area(params,areaCacheKey)
         if areaList:
+            time.sleep(1+random.random())  # 太过频繁，ip会被封
             res = res + areaList
             tmp_len = int(r.get("list_total_len").decode('utf-8')) + len(areaList)
             r.set("list_total_len",tmp_len)
@@ -161,26 +172,29 @@ def  node_info(id):
         'id':  id,
         'typeid': 1
     }
-    result = requests.post(url,data=params,headers=headers,proxies=proxies)
-    content = result.content.decode('utf-8')
-    node = json.loads(content)
-    # {"IsSuccess":"1","Data":[{"id":"77625","f_name":"广西百色东信化工有限责任公司","Year":"2019","recordcount":"1","HY":"无机酸制造","CJId":"0","HaD":"0","gltype":"0","glname":""}]}
-    time.sleep(random.random())  # 太过频繁，ip会被封
-    return node['Data']
+    try:
+        result = requests.post(url,data=params,headers=headers,proxies=proxies)
+        content = result.content.decode('utf-8')
+        node = json.loads(content)
+        # {"IsSuccess":"1","Data":[{"id":"77625","f_name":"广西百色东信化工有限责任公司","Year":"2019","recordcount":"1","HY":"无机酸制造","CJId":"0","HaD":"0","gltype":"0","glname":""}]}
+        time.sleep(random.random())  # 太过频繁，ip会被封
+        return node['Data']
+    except Exception as err:
+        print("get node failed %d "%(int(id)),err," \n")
 
-def deal_result(list=[], file='./result.csv'):
+def deal_result(list1=[], file='./result.csv'):
     '''
     :param file: 最后生成的csv文件
     :return:
     '''
-    if not list:
+    if not list1:
         print("get list error")
         r.delete(cacheKey)
         r.delete(setKey)
         return None
     with open(file,'a',encoding='utf_8_sig') as f:
         f.write("ID,f_name,Year,recordcount,HY,CJId,HaD,gltype,glname,latitude,longitude\n")
-        for item in list:
+        for item in list1:
             id = item[0]
             # 如果已经获取了该节点的详情，就不用再请求了
             if r.sismember(setKey,id):
@@ -195,55 +209,9 @@ def deal_result(list=[], file='./result.csv'):
                     str(node['id']),node['f_name'],str(node['Year']),str(node['recordcount']),
                     str(node['HY']),str(node['CJId']),str(node['HaD']),str(node['gltype']),str(node['glname']),latitude,longitude
                 )
-                print(line)
+                print(line,"\n")
                 f.write(line+"\n")
                 r.sadd(setKey,id)
-
-
-def get_list_by_parmas(industrytype=5,watertype=None,hasvg=None):
-    '''
-    该方法，只能获取大尺度下的数据，不能精确到具体的点，不符合需求,
-    不过可以计算总数，可以验证是否有遗漏
-    :param industrytype:
-    :param watertype:
-    :param hasvg:
-    :return:
-    '''
-    url = "http://www.ipe.org.cn/data_ashx/GetAirData.ashx?xx=getindustryzhoubian_map"
-    params = {
-        'cmd': 'getindustryzhoubian_map',
-        'lat_leftdown': 32.170555,
-        'lng_leftdown': 104.429676,
-        'lat_rightup': 33.374554999999994,
-        'lng_rightup': 106.676276,
-        'level': 5,
-        'parentid': 0,
-        'province': 0,
-        'city': 0,
-        'industrytype': industrytype,  # 5为土壤风险源 4 垃圾焚烧厂 3 污水处理厂 2 近期有新增违规记录或超标排放 1重点排污单位  0,3,4,5,1,2 全部
-        'watertype': watertype, # 排放数据 2 企业反馈 1 自行监测  0,1,2,3 全部
-        'hasvg': hasvg, # 0,1,2 全部  1 有不良记录  2 无不良记录
-        'issearch': 1
-    }
-    headers = {
-        'Content-Type':'application/x-www-form-urlencoded',
-        'Referer': 'http://www.ipe.org.cn/IndustryMap/IndustryMap.aspx?q=7',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36',
-        'Cookie': cookie
-    }
-
-    result = requests.post(url,data=params,headers=headers)
-    content = result.content.decode('utf-8')
-    nodes = json.loads(content)['Data']
-    if not nodes:
-        print("empty result")
-        return None
-    file = str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_result_by_params.csv"
-    with open(file,'wt',encoding='utf_8_sig') as f:
-        #f.write("ID,latitude,longitude,unknow,number,unknow1,unknow2\n")
-        for item in nodes:
-            line = ','.join(item)
-            f.write(line+"\n")
 
 
 def cache_nodeid_from_file(file=''):
@@ -290,10 +258,10 @@ if __name__ == '__main__':
         elif opt in ("--hasvg"):
             hasvg = arg
     # 默认只获取 土壤风险源的
-    list = get_list(industrytype,watertype,hasvg)
-    file = './data/'+str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
+    list1 = get_list(industrytype,watertype,hasvg)
+    file1 = './data/'+str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
     # 从csv文件中，恢复 已处理的 节点集合
-    cache_nodeid_from_file(file)
+    cache_nodeid_from_file(file1)
     # 获取节点信息
-    deal_result(list,file)
+    deal_result(list1,file1)
 
