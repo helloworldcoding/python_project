@@ -214,6 +214,11 @@ def deal_result(list1=[], file='./result.csv'):
                 f.write(line+"\n")
                 r.sadd(setKey,id)
 
+def cache_no_data_area_from_file(f='./no_data_area'):
+    with open(f,'r',encoding='utf-8') as fh:
+        for area in fh:
+            r.sadd('no_data_area',area)
+    
 
 def cache_nodeid_from_file(file=''):
     '''
