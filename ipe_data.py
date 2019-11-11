@@ -12,7 +12,7 @@ import redis
 '''
 从浏览器中复制cookie的值过来
 '''
-cookie="acw_tc=7b39758715707976576964062e7119b5ac4616eaa1681ad955541e129aec1f; ASP.NET_SessionId=2z3zqamqprbw4lpypqr5qxqk; ajaxkey=D1BA155ABCD723D5B2D141BB010DF9C5F8A61EF07E5B96F1; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1571236662|1571236651"
+cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB149600962FAE5D1235533E47C463EFBF0; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1573503320|1573502982"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=1)
@@ -37,7 +37,7 @@ ips = [
 ]
 #request = requests.get(url, proxies={'http': random.choice(pro)}, headers=head) # 让问这个网页 随机生成一个ip
 proxies = {'http':random.choice(ips)}
-#proxies = None
+proxies = None
 
 
 '''
@@ -107,7 +107,7 @@ def query_one_area(params="", areaCacheKey=""):
                     r.sadd("no_data_area",areaCacheKey)
             else:
                 print("get area %s fail, reason: %s \n" % (areaCacheKey,content))
-            time.sleep(random.random())  # 太过频繁，ip会被封
+            time.sleep(5+random.random())  # 太过频繁，ip会被封
         else:
             content = r.get(areaCacheKey).decode('utf-8')
             list1 = json.loads(content)
@@ -115,7 +115,7 @@ def query_one_area(params="", areaCacheKey=""):
         return  list1["Data"] if "Data" in list1 else []
     except Exception as err:
         print(areaCacheKey,err)
-        return None
+        sys.exit(1)
 
 def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
     '''
@@ -146,10 +146,10 @@ def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
         params['lng_leftdown'] = area['lng_leftdown']
         params['lat_rightup'] = area['lat_rightup']
         params['lng_rightup'] = area['lng_rightup']
-        areaCacheKey = 'area_cache_'+str(area['lat_leftdown'])+str(area['lng_leftdown'])+str(area['lat_rightup'])+str(area['lng_rightup'])
+        areaCacheKey = 'area_cache_'+str(area['lat_leftdown'])+'_'+str(area['lng_leftdown'])+'_'+str(area['lat_rightup'])+'_'+str(area['lng_rightup'])
         areaList = query_one_area(params,areaCacheKey)
         if areaList:
-            time.sleep(1+random.random())  # 太过频繁，ip会被封
+            time.sleep(2+random.random())  # 太过频繁，ip会被封
             res = res + areaList
             tmp_len = int(r.get("list_total_len").decode('utf-8')) + len(areaList)
             r.set("list_total_len",tmp_len)
@@ -177,10 +177,11 @@ def  node_info(id):
         content = result.content.decode('utf-8')
         node = json.loads(content)
         # {"IsSuccess":"1","Data":[{"id":"77625","f_name":"广西百色东信化工有限责任公司","Year":"2019","recordcount":"1","HY":"无机酸制造","CJId":"0","HaD":"0","gltype":"0","glname":""}]}
-        time.sleep(random.random())  # 太过频繁，ip会被封
+        time.sleep(2+random.random())  # 太过频繁，ip会被封
         return node['Data']
     except Exception as err:
         print("get node failed %d "%(int(id)),err," \n")
+        sys.exit(1)
 
 def deal_result(list1=[], file='./result.csv'):
     '''
