@@ -12,7 +12,7 @@ import redis
 '''
 从浏览器中复制cookie的值过来
 '''
-cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB149600962FAE5D1235533E47C463EFBF0; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1573503320|1573502982"
+cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB1F92916C7E249390C6C18F463B0C21FE2; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1573505112|1573505100"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=1)
@@ -105,6 +105,8 @@ def query_one_area(params="", areaCacheKey=""):
                     r.set(areaCacheKey,content)
                 else:
                     r.sadd("no_data_area",areaCacheKey)
+                    with open('./no_data_area','a',encoding='utf-8') as f1:
+                        f1.write(areaCacheKey+"\n")
             else:
                 print("get area %s fail, reason: %s \n" % (areaCacheKey,content))
             time.sleep(5+random.random())  # 太过频繁，ip会被封
@@ -215,9 +217,12 @@ def deal_result(list1=[], file='./result.csv'):
                 r.sadd(setKey,id)
 
 def cache_no_data_area_from_file(f='./no_data_area'):
+    '''
+    从缓存文件中，加载没有数据的区域
+    '''
     with open(f,'r',encoding='utf-8') as fh:
         for area in fh:
-            r.sadd('no_data_area',area)
+            r.sadd('no_data_area',area.strip())
     
 
 def cache_nodeid_from_file(file=''):
@@ -243,7 +248,7 @@ if __name__ == '__main__':
     except getopt.GetoptError:
         print ('python ipe_data.py ')
         sys.exit(2)
-    industrytype = 5
+    industrytype = 5,1
     watertype = None
     hasvg = None
     for opt, arg in opts:
@@ -264,6 +269,7 @@ if __name__ == '__main__':
         elif opt in ("--hasvg"):
             hasvg = arg
     # 默认只获取 土壤风险源的
+    cache_no_data_area_from_file('./no_data_area')
     list1 = get_list(industrytype,watertype,hasvg)
     file1 = './data/'+str(industrytype)+"_"+str(watertype)+"_"+str(hasvg)+"_ipe_data.csv"
     # 从csv文件中，恢复 已处理的 节点集合
