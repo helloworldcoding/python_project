@@ -12,7 +12,7 @@ import redis
 '''
 从浏览器中复制cookie的值过来
 '''
-cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB1F92916C7E249390C6C18F463B0C21FE2; SERVERID=8abfb74b5c7dce7c6fa0fa50eb3d63af|1573505112|1573505100"
+cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB1367859372E8873CFDD88302EEB0C3332; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1573508063|1573507023"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=1)
@@ -104,6 +104,7 @@ def query_one_area(params="", areaCacheKey=""):
                 if list1["Data"]:
                     r.set(areaCacheKey,content)
                 else:
+                    print(content,"\n")
                     r.sadd("no_data_area",areaCacheKey)
                     with open('./no_data_area','a',encoding='utf-8') as f1:
                         f1.write(areaCacheKey+"\n")
@@ -119,7 +120,7 @@ def query_one_area(params="", areaCacheKey=""):
         print(areaCacheKey,err)
         sys.exit(1)
 
-def get_list(industrytype=5,watertype=None,hasvg=None,level=18):
+def get_list(industrytype=5,watertype=None,hasvg=None,level=11):
     '''
     筛选条件：
     区域：全国范围，
