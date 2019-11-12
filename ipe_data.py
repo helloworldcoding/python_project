@@ -12,7 +12,7 @@ import redis
 '''
 从浏览器中复制cookie的值过来
 '''
-cookie="ASP.NET_SessionId=jy12q3xpxsg3m1lcmzgilata; acw_tc=65c86a0a15735009288403479e8c2f46697196df7f0727330ab9820a586eac; ajaxkey=78E94BADCF004BB1367859372E8873CFDD88302EEB0C3332; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1573508063|1573507023"
+cookie="__utmz=105455707.1564723333.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __utma=105455707.2050914565.1564723333.1564723333.1566899238.2; acw_tc=7b39758715735516194495112efd49ced10c194691f3cc0472de60a6c367f3; ajaxkey=78E94BADCF004BB12E5DDF75EF99A73E7A7CA83F695CDF59; ASP.NET_SessionId=oafzgx0bdw4cw2qe5cdvrgem; SERVERID=63ce6a224eb1e4e64c95f4d7b348be8a|1573551626|1573551619"
 
 # 连接本地redis
 r = redis.Redis(host="127.0.0.1",port=6379,db=1)
@@ -249,7 +249,7 @@ if __name__ == '__main__':
     except getopt.GetoptError:
         print ('python ipe_data.py ')
         sys.exit(2)
-    industrytype = 5,1
+    industrytype = "5,1"
     watertype = None
     hasvg = None
     for opt, arg in opts:
